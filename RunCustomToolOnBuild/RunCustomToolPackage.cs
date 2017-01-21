@@ -57,7 +57,7 @@ namespace RunCustomToolOnBuild
 			_dte = (DTE)GetService(typeof(DTE));
 			_events = _dte.Events;
 			_documentEvents = _events.DocumentEvents;
-			_events.BuildEvents.OnBuildBegin += BuildEvents_OnBuildBegin;
+			_events.BuildEvents.OnBuildDone += BuildEvents_OnBuildDone;
 			var window = _dte.Windows.Item(EnvDTE.Constants.vsWindowKindOutput);
 
 			var outputWindow = (OutputWindow)window.Object;
@@ -87,39 +87,17 @@ namespace RunCustomToolOnBuild
 			_registerExtenderProviders.Add(cookie, extenderProvider);
 		}
 
-		private void BuildEvents_OnBuildBegin(vsBuildScope Scope, vsBuildAction Action)
+		private void BuildEvents_OnBuildDone(vsBuildScope Scope, vsBuildAction Action)
 		{
 			try
 			{
-				if (Scope == vsBuildScope.vsBuildScopeProject)
+				foreach (Project project in _dte.Solution.Projects)
 				{
-					Project currentProject = GetCurrentProject();
-					if (currentProject != null && currentProject.ProjectItems != null)
+					if (project?.ProjectItems != null)
 					{
-						foreach (ProjectItem projectItem in currentProject.ProjectItems)
+						foreach (ProjectItem projectItem in project.ProjectItems)
+						{
 							CheckProjectItems(projectItem);
-					}
-					else
-					{
-						//If there's no selected project, try the whole solution 
-						foreach (Project project in _dte.Solution.Projects)
-						{
-							if (project != null && project.ProjectItems != null)
-							{
-								foreach (ProjectItem projectItem in project.ProjectItems)
-									CheckProjectItems(projectItem);
-							}
-						}
-					}
-				}
-				else
-				{
-					foreach (Project project in _dte.Solution.Projects)
-					{
-						if (project != null && project.ProjectItems != null)
-						{
-							foreach (ProjectItem projectItem in project.ProjectItems)
-								CheckProjectItems(projectItem);
 						}
 					}
 				}
@@ -129,37 +107,7 @@ namespace RunCustomToolOnBuild
 				LogActivity(ex.ToString());
 			}
 		}
-		Project GetCurrentProject()
-		{
-			IntPtr hierarchyPointer, selectionContainerPointer;
-			Object selectedObject = null;
-			IVsMultiItemSelect multiItemSelect;
-			uint projectItemId;
 
-			IVsMonitorSelection monitorSelection =
-							(IVsMonitorSelection)Package.GetGlobalService(
-							typeof(SVsShellMonitorSelection));
-
-			monitorSelection.GetCurrentSelection(out hierarchyPointer,
-																					 out projectItemId,
-																					 out multiItemSelect,
-																					 out selectionContainerPointer);
-
-			IVsHierarchy selectedHierarchy = Marshal.GetTypedObjectForIUnknown(
-																					 hierarchyPointer,
-																					 typeof(IVsHierarchy)) as IVsHierarchy;
-
-			if (selectedHierarchy != null)
-			{
-				ErrorHandler.ThrowOnFailure(selectedHierarchy.GetProperty(
-																					projectItemId,
-																					(int)__VSHPROPID.VSHPROPID_ExtObject,
-																					out selectedObject));
-			}
-
-			Project selectedProject = selectedObject as Project;
-			return selectedProject;
-		}
 		bool WillRunCustomToolOnBuild(ProjectItem projectItem)
 		{
 			IVsSolution solution = (IVsSolution)GetGlobalService(typeof(SVsSolution));
