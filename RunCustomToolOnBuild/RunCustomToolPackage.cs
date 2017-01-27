@@ -29,6 +29,7 @@ namespace RunCustomToolOnBuild
 		/// RunCustomToolPackage GUID string.
 		/// </summary>
 		public const string PackageGuidString = "f9a70f0c-cb6b-4c22-9e9f-ce86369d191e";
+		private const string GatewayProjectSuffix = ".Gateway";
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="RunCustomToolPackage"/> class.
@@ -73,6 +74,39 @@ namespace RunCustomToolOnBuild
 			RegisterExtenderProvider();
 		}
 
+		private Project GetCurrentProject()
+		{
+			IntPtr hierarchyPointer, selectionContainerPointer;
+			Object selectedObject = null;
+			IVsMultiItemSelect multiItemSelect;
+			uint projectItemId;
+
+			IVsMonitorSelection monitorSelection =
+							(IVsMonitorSelection)Package.GetGlobalService(
+							typeof(SVsShellMonitorSelection));
+
+			monitorSelection.GetCurrentSelection(
+				out hierarchyPointer,
+				out projectItemId,
+				out multiItemSelect,
+				out selectionContainerPointer);
+
+			IVsHierarchy selectedHierarchy = Marshal.GetTypedObjectForIUnknown(
+				hierarchyPointer,
+				typeof(IVsHierarchy)) as IVsHierarchy;
+
+			if (selectedHierarchy != null)
+			{
+				ErrorHandler.ThrowOnFailure(selectedHierarchy.GetProperty(
+					projectItemId,
+					(int)__VSHPROPID.VSHPROPID_ExtObject,
+					out selectedObject));
+			}
+
+			Project selectedProject = selectedObject as Project;
+			return selectedProject;
+		}
+
 		void RegisterExtenderProvider()
 		{
 			var provider = new PropertyExtenderProvider(_dte, this);
@@ -91,13 +125,25 @@ namespace RunCustomToolOnBuild
 		{
 			try
 			{
+				Project currentProject = null;
+
+				if (Scope == vsBuildScope.vsBuildScopeProject)
+				{
+					currentProject = GetCurrentProject();
+				}
+
 				foreach (Project project in _dte.Solution.Projects)
 				{
+					if (!(project?.Name?.EndsWith(GatewayProjectSuffix, StringComparison.InvariantCultureIgnoreCase)).GetValueOrDefault())
+					{
+						continue;
+					}
+
 					if (project?.ProjectItems != null)
 					{
 						foreach (ProjectItem projectItem in project.ProjectItems)
 						{
-							CheckProjectItems(projectItem);
+							CheckProjectItems(projectItem, currentProject);
 						}
 					}
 				}
@@ -140,18 +186,26 @@ namespace RunCustomToolOnBuild
 			}
 			return false;
 		}
-		void CheckProjectItems(ProjectItem projectItem)
+
+		void CheckProjectItems(ProjectItem projectItem, Project currentProject)
 		{
 			if (WillRunCustomToolOnBuild(projectItem))
 			{
-				RunCustomTool(projectItem);
+				var itemConvertedName = projectItem?.ContainingProject?.Name?.Replace(GatewayProjectSuffix, string.Empty);
+				if (currentProject == null ||
+					(itemConvertedName?.Equals(currentProject.Name, StringComparison.InvariantCultureIgnoreCase)).GetValueOrDefault())
+				{
+					RunCustomTool(projectItem);
+				}
+
 				return;
 			}
+
 			if (projectItem.ProjectItems != null && projectItem.ProjectItems.Count > 0)
 			{
 				foreach (ProjectItem innerProjectItem in projectItem.ProjectItems)
 				{
-					CheckProjectItems(innerProjectItem);
+					CheckProjectItems(innerProjectItem, currentProject);
 				}
 			}
 		}
