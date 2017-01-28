@@ -230,9 +230,9 @@ namespace RunCustomToolOnBuild
 			}
 		}
 
-		private void LogActivity(string message)
+	    private void LogActivity(string message)
 		{
-			string prefix = $"[{DateTime.Now.ToString("M/d/y h:mm:ss.FFF", CultureInfo.InvariantCulture)} {LoggingProgramName}] ";
+			string prefix = $"[{DateTime.Now.ToString("yyyy-MM-dd h:mm:ss.FFF", CultureInfo.InvariantCulture)} {LoggingProgramName}] ";
 			_outputPane.Activate();
 			_outputPane.OutputString(prefix + message + Environment.NewLine);
 		}
