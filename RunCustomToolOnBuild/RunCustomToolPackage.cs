@@ -30,6 +30,7 @@ namespace RunCustomToolOnBuild
 		/// </summary>
 		public const string PackageGuidString = "f9a70f0c-cb6b-4c22-9e9f-ce86369d191e";
 		private const string GatewayProjectSuffix = ".Gateway";
+		private const string LoggingProgramName = "GenerateGatewayOnApiBuild";
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="RunCustomToolPackage"/> class.
@@ -217,11 +218,9 @@ namespace RunCustomToolOnBuild
 			solution.GetProjectOfUniqueName(projectItem.ContainingProject.UniqueName, out project);
 			try
 			{
-				string docFullPath = (string)GetPropertyValue(projectItem, "FullPath");
-				if (docFullPath == null)
-					docFullPath = projectItem.Name;
-
-				LogActivity("{0}", docFullPath);
+				string docFullPath = (string)GetPropertyValue(projectItem, "FullPath") ?? projectItem.Name;
+				LogActivity($"Generating file {projectItem.Name}");
+				LogActivity($"Full path: {docFullPath}");
 				VSLangProj.VSProjectItem vsProjectItem = projectItem.Object as VSLangProj.VSProjectItem;
 				vsProjectItem.RunCustomTool();
 			}
@@ -231,23 +230,17 @@ namespace RunCustomToolOnBuild
 			}
 		}
 
-		private void LogActivity(string format, params object[] args)
+		private void LogActivity(string message)
 		{
-			string prefix = $"[{DateTime.Now.ToString("M/d/y h:mm:ss.FFF", CultureInfo.InvariantCulture)} RunCustomToolOnBuild] {format}";
+			string prefix = $"[{DateTime.Now.ToString("M/d/y h:mm:ss.FFF", CultureInfo.InvariantCulture)} {LoggingProgramName}] ";
 			_outputPane.Activate();
-			_outputPane.OutputString(string.Format(prefix, args) + Environment.NewLine);
+			_outputPane.OutputString(prefix + message + Environment.NewLine);
 		}
 
 		private void LogError(IVsHierarchy project, string document, string format, params object[] args)
 		{
 			string text = string.Format(format, args);
 			LogErrorTask(project, document, TaskErrorCategory.Error, text);
-		}
-
-		private void LogWarning(IVsHierarchy project, string document, string format, params object[] args)
-		{
-			string text = string.Format(format, args);
-			LogErrorTask(project, document, TaskErrorCategory.Warning, text);
 		}
 
 		private void LogErrorTask(IVsHierarchy project, string document, TaskErrorCategory errorCategory, string text)
